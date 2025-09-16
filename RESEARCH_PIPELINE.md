@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the evolution of the Cordyceps-BigBrain training queue from a simple job runner to a comprehensive **automated research pipeline** with AI agents handling analysis, reporting, and publication.
+This document outlines the evolution of a basic training queue from a simple job runner to a comprehensive **automated research pipeline** with AI agents handling analysis, reporting, and publication.
 
 **Current Status**: Basic queueing system with job creation, processing, locking, and error handling (13/13 tests passing)
 
@@ -49,7 +49,7 @@ This document outlines the evolution of the Cordyceps-BigBrain training queue fr
   "experiment_id": "exp_gpt2_lr_sweep_001",
   "name": "gpt2-medium_lr_0.001_epochs_3",
   "description": "Testing learning rate sensitivity on medium GPT-2",
-  "hypothesis": "Lower learning rates improve tool-use accuracy in Cordyceps",
+  "hypothesis": "Lower learning rates improve tool-use accuracy in language models",
   "research_question": "How does learning rate affect tool-calling performance?",
 
   "config": {
@@ -63,24 +63,24 @@ This document outlines the evolution of the Cordyceps-BigBrain training queue fr
   "deliverables": [
     {
       "type": "wandb_run",
-      "project": "cordyceps-bigbrain",
+      "project": "research-experiments",
       "run_id": "auto-generated",
       "validation": "synced_and_downloadable"
     },
     {
       "type": "model_checkpoint",
-      "path": "out/cordyceps/final_model",
+      "path": "output/final_model",
       "validation": "exists_and_loadable"
     },
     {
       "type": "training_metrics",
-      "path": "out/cordyceps/metrics.json",
+      "path": "output/metrics.json",
       "validation": "contains_keys",
       "required_keys": ["train_loss", "eval_loss", "final_accuracy"]
     },
     {
       "type": "evaluation_results",
-      "path": "out/cordyceps/eval_results.json",
+      "path": "output/eval_results.json",
       "validation": "threshold",
       "metric": "accuracy",
       "operator": ">=",
@@ -135,14 +135,14 @@ This document outlines the evolution of the Cordyceps-BigBrain training queue fr
   "deliverables_status": {
     "wandb_run": {
       "status": "delivered",
-      "project": "cordyceps-bigbrain",
+      "project": "research-experiments",
       "run_id": "abc123",
       "validated": true,
       "validation_method": "synced_and_downloadable"
     },
     "model_checkpoint": {
       "status": "delivered",
-      "path": "out/cordyceps/final_model",
+      "path": "output/final_model",
       "validated": true,
       "validation_method": "exists_and_loadable"
     }
@@ -162,9 +162,9 @@ This document outlines the evolution of the Cordyceps-BigBrain training queue fr
   },
 
   "artifacts": [
-    "out/cordyceps/final_model/",
-    "out/cordyceps/metrics.json",
-    "out/cordyceps/training_curves.png"
+    "output/final_model/",
+    "output/metrics.json",
+    "output/training_curves.png"
   ],
 
   "analysis_reports": [
@@ -316,7 +316,7 @@ experiment_submission:validate:
 
 training_execution:run:
   dependencies: experiment_submission:validate
-  script: python scripts/train_cordyceps.py --run-experiment
+  script: python scripts/train_model.py --run-experiment
   artifacts:
     - wandb_run
     - model_checkpoint
