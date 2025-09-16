@@ -132,3 +132,6 @@ dmypy.json
 experiments/
 artifacts/
 *.zip
+
+# VS Code settings
+.vscode/
