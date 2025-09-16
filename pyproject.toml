@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-research-pipeline"
+version = "0.1.0"
+description = "Open Research Pipeline - Automated experiment management and analysis system"
+authors = [
+    {name = "nomadicsynth", email = "nomadicsynth@example.com"}
+]
+dependencies = [
+    "click>=8.0.0",
+    "pyyaml>=6.0",
+    "rich>=13.0.0",
+    "pydantic>=2.0.0",
+    "wandb>=0.15.0",
+    "python-dotenv>=1.0.0"
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = {text = "MIT"}
+
+[project.scripts]
+orp = "open_research_pipeline.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0"
+]
+docs = [
+    "mkdocs>=1.4.0",
+    "mkdocs-material>=9.0.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"</content>
+<parameter name="filePath">/mnt/ai-stuff-fast/cordyceps-bigbrain/open-research-pipeline/pyproject.toml

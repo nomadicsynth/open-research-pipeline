@@ -1,0 +1,37 @@
+# Example experiment configuration for BigBrain Cordyceps
+experiment:
+  name: "cordyceps_lr_sweep"
+  description: "Testing learning rate sensitivity on Cordyceps model"
+
+training:
+  script: "python scripts/train_cordyceps.py"
+  config:
+    model_name: "gpt2"
+    dataset_path: "data/toolACE-BigBrain/train/data-00000-of-00001.arrow"
+    output_dir: "output/cordyceps"
+    learning_rate: 0.001
+    num_train_epochs: 3
+    per_device_train_batch_size: 8
+    save_steps: 500
+    logging_steps: 100
+    use_wandb: true
+    wandb_project: "cordyceps-bigbrain"
+    save_final_model: true
+
+deliverables:
+  - type: "model_checkpoint"
+    path: "output/cordyceps"
+    validation: "exists"
+
+  - type: "tokenizer"
+    path: "output/cordyceps"
+    validation: "exists"
+
+  - type: "wandb_run"
+    project: "cordyceps-bigbrain"
+    validation: "synced"
+
+metadata:
+  researcher: "nomadicsynth"
+  tags: ["cordyceps", "lr_sweep", "gpt2"]
+  priority: "high"
