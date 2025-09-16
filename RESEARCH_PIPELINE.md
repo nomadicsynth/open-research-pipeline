@@ -559,7 +559,3 @@ publication:prepare:
 - Responsible AI development practices
 - Ensuring diverse and inclusive research directions
 - Maintaining human agency in AI-driven research
-
----
-
-Last Updated: September 16, 2025

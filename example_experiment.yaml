@@ -7,7 +7,7 @@ training:
   script: "python scripts/train_cordyceps.py"
   config:
     model_name: "gpt2"
-    dataset_path: "data/toolACE-BigBrain/train/data-00000-of-00001.arrow"
+    dataset_path: "data/toolACE-BigBrain/train
     output_dir: "output/cordyceps"
     learning_rate: 0.001
     num_train_epochs: 3

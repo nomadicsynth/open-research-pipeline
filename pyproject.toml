@@ -7,7 +7,7 @@ name = "open-research-pipeline"
 version = "0.1.0"
 description = "Open Research Pipeline - Automated experiment management and analysis system"
 authors = [
-    {name = "nomadicsynth", email = "nomadicsynth@example.com"}
+    {name = "nomadicsynth", email = "nomadicsynth@neoncortex.com.au"}
 ]
 dependencies = [
     "click>=8.0.0",
@@ -41,5 +41,4 @@ docs = [
 where = ["src"]
 
 [tool.setuptools.package-dir]
-"" = "src"</content>
-<parameter name="filePath">/mnt/ai-stuff-fast/cordyceps-bigbrain/open-research-pipeline/pyproject.toml
+"" = "src"
