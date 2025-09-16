@@ -150,7 +150,7 @@ isort src/
 
 ## License
 
-AGPL-3.0 License. See `LICENSE` for details.
+MIT License. See `LICENSE` for details.
 
 ## Contact
 
