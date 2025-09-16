@@ -1,6 +1,7 @@
-# Open Research Pipeline
+# Open Research Pipeline - A concept for managing ML research experiments
 
-An automated experiment management and analysis system for machine learning research.
+A concept for an automated experiment management and analysis system for machine learning research.
+This is here top inspire thought and prompt discussion, and may be expanded into a working system. Currently the code is untested and incomplete. Think of the whole repo as pseudocode.
 
 ## Overview
 
