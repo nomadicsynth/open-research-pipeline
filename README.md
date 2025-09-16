@@ -1,7 +1,7 @@
 # Open Research Pipeline - A concept for managing ML research experiments
 
 A concept for an automated experiment management and analysis system for machine learning research.
-This is here top inspire thought and prompt discussion, and may be expanded into a working system. Currently the code is untested and incomplete. Think of the whole repo as pseudocode.
+This is here to inspire thought and prompt discussion, and may be expanded into a working system. Currently the code is untested and incomplete. Think of the whole repo as pseudocode.
 
 ## Overview
 
@@ -30,33 +30,33 @@ pip install -e ".[dev]"
 
 1. Create an experiment configuration:
 
-```yaml
-# experiment.yaml
-experiment:
-  name: "my-first-experiment"
-  description: "Testing learning rate sensitivity"
+    ```yaml
+    # experiment.yaml
+    experiment:
+      name: "my-first-experiment"
+      description: "Testing learning rate sensitivity"
 
-training:
-  script: "python train.py"
-  config:
-    learning_rate: 0.001
-    epochs: 10
+    training:
+      script: "python train.py"
+      config:
+        learning_rate: 0.001
+        epochs: 10
 
-deliverables:
-  - type: "model_checkpoint"
-    path: "output/model"
-    validation: "exists"
-  - type: "metrics"
-    path: "output/metrics.json"
-    validation: "contains_keys"
-    required_keys: ["accuracy", "loss"]
-```
+    deliverables:
+      - type: "model_checkpoint"
+        path: "output/model"
+        validation: "exists"
+      - type: "metrics"
+        path: "output/metrics.json"
+        validation: "contains_keys"
+        required_keys: ["accuracy", "loss"]
+    ```
 
 2. Run the experiment:
 
-```bash
-orp run experiment.yaml
-```
+    ```bash
+    orp run experiment.yaml
+    ```
 
 ## Architecture
 
