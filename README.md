@@ -153,5 +153,4 @@ MIT License - see LICENSE file for details.
 
 ## Contact
 
-For questions or contributions, please open an issue on GitHub.</content>
-<parameter name="filePath">/mnt/ai-stuff-fast/cordyceps-bigbrain/open-research-pipeline/README.md
+For questions or contributions, please open an issue on GitHub.
