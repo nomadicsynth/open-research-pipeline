@@ -2,8 +2,10 @@
 
 import click
 from pathlib import Path
+import os
 
 from open_research_pipeline.core.runner import ExperimentRunner, ExperimentConfig
+from open_research_pipeline.core.github_client import GitHubConfig
 
 
 @click.group()
@@ -140,6 +142,139 @@ def info(experiment_id, base_dir):
             return
 
     click.echo(f"❌ Experiment {experiment_id} not found")
+
+
+@main.command()
+@click.option('--repo', default=None, help='GitHub repository in format owner/repo')
+@click.option('--token', default=None, help='GitHub token (or set GITHUB_TOKEN env var)')
+@click.option('--state', default='open', help='Issue state: open, closed, all')
+@click.option('--labels', default='experiment', help='Comma-separated list of labels')
+def list(repo, token, state, labels):
+    """List experiments from GitHub issues."""
+    try:
+        # Setup GitHub config
+        if not token:
+            token = os.getenv('GITHUB_TOKEN')
+        if not token:
+            click.echo("❌ GitHub token required. Set GITHUB_TOKEN env var or use --token", err=True)
+            exit(1)
+
+        if not repo:
+            repo = os.getenv('GITHUB_REPOSITORY', 'nomadicsynth/open-research-pipeline')
+
+        github_config = GitHubConfig(
+            token=token,
+            repo_owner=repo.split('/')[0],
+            repo_name=repo.split('/')[1]
+        )
+
+        runner = ExperimentRunner(github_config=github_config)
+        experiments = runner.list_github_experiments(
+            state=state,
+            labels=labels.split(',') if labels else None
+        )
+
+        if not experiments:
+            click.echo("No experiments found")
+            return
+
+        click.echo(f"🔬 Found {len(experiments)} experiments:")
+        for exp in experiments:
+            assignee = f" 👤 {exp.assignee}" if exp.assignee else ""
+            click.echo(f"  #{exp.issue_number}: {exp.title}{assignee}")
+            if exp.metadata.get('command'):
+                click.echo(f"    Command: {exp.metadata['command']}")
+
+    except Exception as e:
+        click.echo(f"❌ Error: {str(e)}", err=True)
+        exit(1)
+
+
+@main.command()
+@click.argument('issue_number', type=int)
+@click.option('--repo', default=None, help='GitHub repository in format owner/repo')
+@click.option('--token', default=None, help='GitHub token (or set GITHUB_TOKEN env var)')
+@click.option('--assignee', default=None, help='GitHub username to assign (defaults to token user)')
+def claim(issue_number, repo, token, assignee):
+    """Claim an experiment from GitHub issue."""
+    try:
+        # Setup GitHub config
+        if not token:
+            token = os.getenv('GITHUB_TOKEN')
+        if not token:
+            click.echo("❌ GitHub token required. Set GITHUB_TOKEN env var or use --token", err=True)
+            exit(1)
+
+        if not repo:
+            repo = os.getenv('GITHUB_REPOSITORY', 'nomadicsynth/open-research-pipeline')
+
+        github_config = GitHubConfig(
+            token=token,
+            repo_owner=repo.split('/')[0],
+            repo_name=repo.split('/')[1]
+        )
+
+        runner = ExperimentRunner(github_config=github_config)
+
+        # Get current user if no assignee specified
+        if not assignee:
+            from github import Github
+            g = Github(token)
+            assignee = g.get_user().login
+
+        success = runner.claim_github_experiment(issue_number, assignee)
+
+        if success:
+            click.echo(f"✅ Successfully claimed experiment #{issue_number}")
+        else:
+            click.echo(f"❌ Failed to claim experiment #{issue_number} (may already be claimed)")
+
+    except Exception as e:
+        click.echo(f"❌ Error: {str(e)}", err=True)
+        exit(1)
+
+
+@main.command()
+@click.argument('issue_number', type=int)
+@click.option('--repo', default=None, help='GitHub repository in format owner/repo')
+@click.option('--token', default=None, help='GitHub token (or set GITHUB_TOKEN env var)')
+@click.option('--base-dir', default='experiments', help='Base directory for experiments')
+def run_github(issue_number, repo, token, base_dir):
+    """Run an experiment from GitHub issue."""
+    try:
+        # Setup GitHub config
+        if not token:
+            token = os.getenv('GITHUB_TOKEN')
+        if not token:
+            click.echo("❌ GitHub token required. Set GITHUB_TOKEN env var or use --token", err=True)
+            exit(1)
+
+        if not repo:
+            repo = os.getenv('GITHUB_REPOSITORY', 'nomadicsynth/open-research-pipeline')
+
+        github_config = GitHubConfig(
+            token=token,
+            repo_owner=repo.split('/')[0],
+            repo_name=repo.split('/')[1]
+        )
+
+        runner = ExperimentRunner(base_dir=base_dir, github_config=github_config)
+
+        click.echo(f"🚀 Running experiment from GitHub issue #{issue_number}")
+        result = runner.run_github_experiment(issue_number)
+
+        if result.status == 'completed':
+            click.echo(f"✅ Experiment completed successfully: {result.experiment_id}")
+            click.echo(f"📦 Artifacts saved to: {result.artifacts_path}")
+        else:
+            click.echo(f"❌ Experiment failed: {result.experiment_id}")
+            if result.error_message:
+                click.echo(f"Error: {result.error_message}")
+            exit(1)
+
+    except Exception as e:
+        click.echo(f"❌ Error: {str(e)}", err=True)
+        exit(1)
 
 
 if __name__ == '__main__':

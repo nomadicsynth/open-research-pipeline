@@ -15,7 +15,8 @@ dependencies = [
     "rich",
     "pydantic",
     "wandb",
-    "python-dotenv"
+    "python-dotenv",
+    "PyGitHub"
 ]
 requires-python = ">=3.8"
 readme = "README.md"

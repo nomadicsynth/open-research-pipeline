@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from .github_client import GitHubClient, GitHubConfig, ExperimentIssue
+
 
 @dataclass
 class ExperimentConfig:
@@ -56,12 +58,17 @@ class ExperimentResult:
 class ExperimentRunner:
     """Core experiment runner that orchestrates training and validation."""
 
-    def __init__(self, base_dir: str = "experiments"):
+    def __init__(self, base_dir: str = "experiments", github_config: Optional[GitHubConfig] = None):
         self.base_dir = Path(base_dir)
         self.queue_dir = self.base_dir / "queue"
         self.completed_dir = self.base_dir / "completed"
         self.failed_dir = self.base_dir / "failed"
         self.artifacts_dir = self.base_dir / "artifacts"
+
+        # GitHub integration
+        self.github_client: Optional[GitHubClient] = None
+        if github_config:
+            self.github_client = GitHubClient(github_config)
 
         # Create directories
         for dir_path in [self.queue_dir, self.completed_dir, self.failed_dir, self.artifacts_dir]:
@@ -262,3 +269,82 @@ class ExperimentRunner:
             json.dump(result_data, f, indent=2)
 
         print(f"Saved result to: {result_path}")
+
+    # GitHub integration methods
+    def list_github_experiments(self, state: str = "open", labels: Optional[List[str]] = None) -> List[ExperimentIssue]:
+        """List experiments from GitHub issues."""
+        if not self.github_client:
+            raise ValueError("GitHub client not configured")
+        return self.github_client.list_experiments(state=state, labels=labels)
+
+    def get_github_experiment(self, issue_number: int) -> ExperimentIssue:
+        """Get experiment details from GitHub issue."""
+        if not self.github_client:
+            raise ValueError("GitHub client not configured")
+        return self.github_client.get_experiment(issue_number)
+
+    def claim_github_experiment(self, issue_number: int, assignee: str) -> bool:
+        """Claim an experiment on GitHub."""
+        if not self.github_client:
+            raise ValueError("GitHub client not configured")
+        return self.github_client.claim_experiment(issue_number, assignee)
+
+    def run_github_experiment(self, issue_number: int) -> ExperimentResult:
+        """Run an experiment from GitHub issue."""
+        if not self.github_client:
+            raise ValueError("GitHub client not configured")
+
+        # Get experiment from GitHub
+        experiment_issue = self.get_github_experiment(issue_number)
+
+        # Parse config from metadata
+        config = self._config_from_github_issue(experiment_issue)
+
+        # Update status to in-progress
+        self.github_client.update_experiment_status(
+            issue_number,
+            "in-progress",
+            "Starting experiment execution..."
+        )
+
+        try:
+            # Run the experiment
+            result = self.run_experiment(config)
+
+            # Update status based on result
+            if result.status == "completed":
+                self.github_client.update_experiment_status(
+                    issue_number,
+                    "completed",
+                    f"Experiment completed successfully. Artifacts: {result.artifacts_path}"
+                )
+            else:
+                self.github_client.update_experiment_status(
+                    issue_number,
+                    "failed",
+                    f"Experiment failed: {result.error_message}"
+                )
+
+            return result
+
+        except Exception as e:
+            # Update status on failure
+            self.github_client.update_experiment_status(
+                issue_number,
+                "failed",
+                f"Experiment execution failed: {str(e)}"
+            )
+            raise
+
+    def _config_from_github_issue(self, issue: ExperimentIssue) -> ExperimentConfig:
+        """Create ExperimentConfig from GitHub issue metadata."""
+        metadata = issue.metadata
+
+        return ExperimentConfig(
+            name=metadata.get('title', issue.title),
+            description=issue.body,
+            training_script=metadata.get('command', ''),
+            training_config={},  # Could parse additional config from metadata
+            deliverables=[],     # Could define deliverables in metadata
+            metadata=metadata
+        )
