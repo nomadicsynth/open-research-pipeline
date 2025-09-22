@@ -112,6 +112,11 @@ owner: GitHub handle or none
 tags: [experiment, domain, type]
 priority: low|medium|high
 status: open|claimed|in-progress|completed|failed
+# Command: either a shell string (legacy) or a list of arguments (preferred).
+# When using a list, write the command as YAML sequence, for example:
+# command: ["python", "train.py", "--config=config.yaml"]
+# The runner captures training logs (stdout/stderr) and includes them inside the
+# artifacts zip created for the experiment (e.g. experiments/artifacts/exp_..._artifacts.zip)
 command: docker run ... OR python train.py --config=config.yaml
 env: container-image: "ghcr.io/org/image:tag"
 dataset: name + version + url
@@ -390,6 +395,62 @@ orp status
 # Get experiment details (existing functionality)
 orp info exp_20231201_120000
 ```
+
+## Sweep: claim-and-run
+
+To run a parameter sweep with community volunteers with minimal owner setup, use the "claim-by-comment" pattern:
+
+- Create an experiment issue using the `Experiment` template and include a `sweep` metadata block (see the template for an example).
+- Volunteers claim a shard by posting a comment like `claim shard 17` on the issue, or by using the `orp claim-shard` helper (included in `orp` CLI) which posts a standardized claim comment and token.
+- Volunteers run the experiment locally (or via their own runners), upload artifacts to agreed storage (S3/GCS/Zenodo), and post a result comment including the claim token and artifact URL.
+
+Owner responsibilities (minimal):
+
+- Add the issue using the template (one-time).
+- Optionally provide a small public sample dataset for volunteers to do smoke runs.
+- Optionally run the aggregation Action (one-click) to collect artifact links and summarize results.
+
+Volunteer steps (copy-paste):
+
+```bash
+# Authenticate with gh (GitHub CLI) or set GITHUB_TOKEN
+gh auth login
+
+# Claim a shard (issue 123, shard 17 out of 200)
+orp claim-shard 123 17 --total 200
+
+# Run locally (example)
+export SHARD=17/200
+orp run --shard "$SHARD"
+
+# Upload artifacts and post result
+aws s3 cp results/shard-17.zip s3://my-bucket/experiments/123/shard-17.zip
+gh issue comment 123 --body "Completed shard 17/200 (token <token>): s3://my-bucket/experiments/123/shard-17.zip\nmetrics: accuracy=0.82"
+```
+
+This pattern requires no infra maintained by the repo owner. Occasional duplicate claims are possible; volunteers should check existing comments before running. See the docs section on provenance for recommended metadata to include in claim and result comments.
+
+### Note: specifying the repository for GitHub commands
+
+Commands in the `orp` CLI that interact with GitHub require an explicit repository target. You must either pass `--repo owner/repo` to the command or set the `GITHUB_REPOSITORY` environment variable in your shell. This avoids accidental operations on the wrong repository.
+
+Examples:
+
+```bash
+# supply repo explicitly
+orp list --repo myorg/myrepo --token "$GITHUB_TOKEN"
+
+# or export once in your shell
+export GITHUB_REPOSITORY="myorg/myrepo"
+orp claim-shard 123 17 --total 200
+```
+
+Minimal token scopes for volunteers
+
+- For public repositories: `public_repo` (or use `gh auth login` which scopes appropriately).
+- For private repositories: `repo` scope is required for posting comments and editing labels.
+
+If neither `--repo` nor `GITHUB_REPOSITORY` is provided, `orp` will print an error and exit.
 
 ## GitHub Actions Integration
 

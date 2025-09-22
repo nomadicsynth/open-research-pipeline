@@ -1,0 +1,52 @@
+name: Aggregate Sweep Results
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number for the sweep to aggregate'
+        required: true
+        type: number
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Aggregate artifact links from issue comments
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issue = context.payload.inputs.issue_number || process.env.INPUT_ISSUE_NUMBER
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue,
+              per_page: 100
+            })
+
+            // simple extraction of URLs and tokens
+            const results = []
+            for (const c of comments) {
+              const body = c.body || ''
+              const urlMatch = body.match(/https?:\/\/[\S]+/g)
+              const tokenMatch = body.match(/token[:\s]*([a-f0-9\-]{8,36})/i)
+              if (urlMatch) {
+                for (const u of urlMatch) {
+                  results.push({ commenter: c.user.login, url: u, token: tokenMatch ? tokenMatch[1] : null })
+                }
+              }
+            }
+
+            if (results.length === 0) {
+              core.info('No artifact links found in comments')
+            } else {
+              core.info(JSON.stringify(results, null, 2))
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue,
+                body: 'Aggregation complete. Found ' + results.length + ' artifact links. See workflow logs for details.'
+              })
+            }

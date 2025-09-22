@@ -1,0 +1,20 @@
+experiment:
+  name: "demo_experiment"
+  description: "A small demo experiment that writes a fake model file and metrics"
+
+training:
+  script: "python /mnt/ai-stuff-fast/open-research-pipeline/train.py"
+  config:
+    learning_rate: 0.01
+    epochs: 2
+
+deliverables:
+  - type: "model"
+    path: "output/model"
+    validation: "exists"
+  - type: "metrics"
+    path: "output/metrics.json"
+    validation: "contains_keys"
+    required_keys:
+      - accuracy
+      - learning_rate

@@ -117,6 +117,20 @@ This document outlines the evolution of a basic training queue from a simple job
 - **Evaluation Results**: `threshold` - validate performance meets criteria
 - **System Metrics**: `exists` - CPU/memory usage, timing data
 
+Note on training command format and logs
+--------------------------------------
+
+- The pipeline accepts the training command either as a single string (legacy) or as a list of arguments (recommended). Using a list avoids shell parsing ambiguity and is the preferred configuration style for `training.script`.
+
+Example YAML:
+
+```yaml
+training:
+  script: ["python", "train.py", "--config=config.yaml"]
+```
+
+- Training stdout/stderr are captured to `training_stdout.txt` and `training_stderr.txt` and included inside the experiment artifacts zip file (the runner sets `artifacts_path` on the result). These log files can be referenced as `path/to/zip::training_stdout.txt` and `path/to/zip::training_stderr.txt` in downstream tooling.
+
 #### 3. Analysis Outputs
 
 - **Plots/Charts**: `exists` - training curves, confusion matrices

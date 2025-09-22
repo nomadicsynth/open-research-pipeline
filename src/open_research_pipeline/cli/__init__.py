@@ -160,7 +160,10 @@ def list(repo, token, state, labels):
             exit(1)
 
         if not repo:
-            repo = os.getenv('GITHUB_REPOSITORY', 'nomadicsynth/open-research-pipeline')
+            repo = os.getenv('GITHUB_REPOSITORY')
+        if not repo:
+            click.echo("❌ GitHub repository required. Set GITHUB_REPOSITORY env var or use --repo", err=True)
+            exit(1)
 
         github_config = GitHubConfig(
             token=token,
@@ -206,7 +209,10 @@ def claim(issue_number, repo, token, assignee):
             exit(1)
 
         if not repo:
-            repo = os.getenv('GITHUB_REPOSITORY', 'nomadicsynth/open-research-pipeline')
+            repo = os.getenv('GITHUB_REPOSITORY')
+        if not repo:
+            click.echo("❌ GitHub repository required. Set GITHUB_REPOSITORY env var or use --repo", err=True)
+            exit(1)
 
         github_config = GitHubConfig(
             token=token,
@@ -236,6 +242,74 @@ def claim(issue_number, repo, token, assignee):
 
 @main.command()
 @click.argument('issue_number', type=int)
+@click.argument('shard', type=str)
+@click.option('--total', type=int, required=True, help='Total number of shards')
+@click.option('--repo', default=None, help='GitHub repository in format owner/repo')
+@click.option('--token', default=None, help='GitHub token (or set GITHUB_TOKEN env var)')
+def claim_shard(issue_number, shard, total, repo, token):
+    """Post a claim comment for a specific shard on an issue and print run instructions.
+
+    Example: orp claim-shard 123 17 --total 200
+    """
+    import subprocess
+    import uuid
+    try:
+        if not token:
+            token = os.getenv('GITHUB_TOKEN')
+        if not token:
+            click.echo("❌ GitHub token required. Set GITHUB_TOKEN env var or use --token", err=True)
+            exit(1)
+
+        if not repo:
+            repo = os.getenv('GITHUB_REPOSITORY')
+        if not repo:
+            click.echo("❌ GitHub repository required. Set GITHUB_REPOSITORY env var or use --repo", err=True)
+            exit(1)
+
+        # determine user login via gh api
+        try:
+            completed = subprocess.run(['gh', 'api', 'user', '--jq', '.login'], check=True, capture_output=True, text=True)
+            user = completed.stdout.strip()
+        except Exception:
+            # fallback to placeholder
+            user = 'unknown'
+
+        token_str = str(uuid.uuid4())
+
+        body = (
+            f"Claim: @{user} shard {shard}/{total}\n\n"
+            f"token: {token_str}\n\n"
+            f"Runner: local\n\n"
+            f"Commit: $(git rev-parse HEAD)\n\n"
+            f"Run command: export SHARD={shard}/{total} && orp run --shard \"{shard}/{total}\"\n\n"
+            "After run: upload artifacts to your storage and post a comment with the artifact URL and the token."
+        )
+
+        # Post the comment using gh
+        try:
+            subprocess.run(['gh', 'issue', 'comment', str(issue_number), '--body', body], check=True)
+            # add label claimed (best-effort)
+            subprocess.run(['gh', 'issue', 'edit', str(issue_number), '--add-label', 'claimed'], check=False)
+        except Exception as e:
+            click.echo(f"❌ Failed to post claim comment via gh: {e}", err=True)
+            exit(1)
+
+        click.echo(f"✅ Posted claim for shard {shard}/{total} on issue #{issue_number}")
+        click.echo(f"🔑 Claim token: {token_str}")
+        click.echo("")
+        click.echo("Run instructions:")
+        click.echo(f"  export SHARD={shard}/{total}")
+        click.echo(f"  orp run --shard \"{shard}/{total}\"")
+        click.echo("")
+        click.echo("When finished, upload artifacts to S3/GCS/Zenodo and post a comment like:\n  Completed shard {shard}/{total} (token {token_str}): <artifact_url>")
+
+    except Exception as e:
+        click.echo(f"❌ Error: {str(e)}", err=True)
+        exit(1)
+
+
+@main.command()
+@click.argument('issue_number', type=int)
 @click.option('--repo', default=None, help='GitHub repository in format owner/repo')
 @click.option('--token', default=None, help='GitHub token (or set GITHUB_TOKEN env var)')
 @click.option('--base-dir', default='experiments', help='Base directory for experiments')
@@ -250,7 +324,10 @@ def run_github(issue_number, repo, token, base_dir):
             exit(1)
 
         if not repo:
-            repo = os.getenv('GITHUB_REPOSITORY', 'nomadicsynth/open-research-pipeline')
+            repo = os.getenv('GITHUB_REPOSITORY')
+        if not repo:
+            click.echo("❌ GitHub repository required. Set GITHUB_REPOSITORY env var or use --repo", err=True)
+            exit(1)
 
         github_config = GitHubConfig(
             token=token,

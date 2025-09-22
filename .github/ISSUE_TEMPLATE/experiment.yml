@@ -1,0 +1,39 @@
+name: Experiment Proposal
+description: Propose a new research experiment or sweep
+title: "[EXPERIMENT] "
+labels: ["experiment", "proposal"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Experiment Description
+      description: Detailed description of the experiment
+    validations:
+      required: true
+
+  - type: textarea
+    id: metadata
+    attributes:
+      label: Experiment Metadata
+      description: |-
+        Include YAML metadata at the top of the issue between triple dashes. For sweep experiments include a `sweep` block like:
+
+          ---
+          title: Short experiment title
+          owner: none
+          tags: [experiment, sweep]
+          total-shards: 200
+          sweep:
+            param_grid:
+              lr: [1e-4, 3e-4, 1e-3]
+              batch_size: [16,32,64]
+              seed: [0,1,2,3,4]
+            split_strategy: cartesian
+          command: ["python","train.py","--lr=${lr}","--batch-size=${batch_size}","--seed=${seed}"]
+          artifact-location: "s3://my-bucket/experiments/#{issue}/shard-${SHARD}.zip"
+          notes: "Volunteers claim a shard by commenting 'claim shard N' on this issue, then run locally and upload artifacts to S3 and post the link as a comment."
+          ---
+
+        See repository docs for claiming and running sweep shards.
+    validations:
+      required: true
