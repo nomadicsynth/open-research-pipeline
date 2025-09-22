@@ -58,6 +58,24 @@ pip install -e ".[dev]"
     orp run experiment.yaml
     ```
 
+Notes on `training.script` and logs
+-------------------------------
+
+- `training.script` may be specified either as a string (backwards-compatible) or as a list of command arguments (recommended). Example:
+
+```yaml
+training:
+  # string form (legacy)
+  script: "python train.py --config=config.yaml"
+
+  # preferred list form
+  script: ["python", "train.py", "--config=config.yaml"]
+```
+
+- The runner captures the training process stdout and stderr into files named `training_stdout.txt` and `training_stderr.txt` and includes both files inside the experiment artifacts zip (`experiments/artifacts/<experiment_id>_artifacts.zip`).
+
+- The `ExperimentResult` returned by the runner includes `artifacts_path` (path to the zip) and optional zip-qualified log paths in `training_stdout_path` and `training_stderr_path` using the format `path/to/zip::training_stdout.txt`.
+
 ## Architecture
 
 ```text

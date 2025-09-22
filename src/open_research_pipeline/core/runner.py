@@ -11,7 +11,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
@@ -24,7 +24,8 @@ class ExperimentConfig:
 
     name: str
     description: str = ""
-    training_script: str = ""
+    # Accept either a shell string or a list of command arguments (preferred)
+    training_script: Union[str, List[str]] = ""
     training_config: Dict[str, Any] = None
     deliverables: List[Dict[str, Any]] = None
     metadata: Dict[str, Any] = None
@@ -49,6 +50,8 @@ class ExperimentResult:
     deliverables_status: Dict[str, Any] = None
     error_message: Optional[str] = None
     artifacts_path: Optional[str] = None
+    training_stdout_path: Optional[str] = None
+    training_stderr_path: Optional[str] = None
 
     def __post_init__(self):
         if self.deliverables_status is None:
@@ -97,56 +100,95 @@ class ExperimentRunner:
         print(f"Name: {config.name}")
         print(f"Description: {config.description}")
 
+        # We'll create a temporary directory manually (mkdtemp) so we can copy logs on failure
+        temp_dir = tempfile.mkdtemp()
+        temp_path = Path(temp_dir)
+
         try:
-            # Create temporary directory for this experiment
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
+            # Run the training script
+            self._run_training_script(config, temp_path)
 
-                # Run the training script
-                self._run_training_script(config, temp_path)
+            # Validate deliverables
+            deliverables_status = self._validate_deliverables(config.deliverables, temp_path)
 
-                # Validate deliverables
-                deliverables_status = self._validate_deliverables(config.deliverables, temp_path)
+            # Package artifacts (zip path)
+            zip_path = self._package_artifacts(experiment_id, config.deliverables, temp_path)
 
-                # Package artifacts
-                artifacts_path = self._package_artifacts(experiment_id, config.deliverables, temp_path)
+            end_time = datetime.now()
 
-                end_time = datetime.now()
+            result = ExperimentResult(
+                experiment_id=experiment_id,
+                status="completed",
+                start_time=start_time,
+                end_time=end_time,
+                deliverables_status=deliverables_status,
+                artifacts_path=str(zip_path) if zip_path else None,
+                training_stdout_path=(f"{zip_path}::training_stdout.txt") if (temp_path / "training_stdout.txt").exists() else None,
+                training_stderr_path=(f"{zip_path}::training_stderr.txt") if (temp_path / "training_stderr.txt").exists() else None,
+            )
 
-                result = ExperimentResult(
-                    experiment_id=experiment_id,
-                    status="completed",
-                    start_time=start_time,
-                    end_time=end_time,
-                    deliverables_status=deliverables_status,
-                    artifacts_path=str(artifacts_path)
-                )
-
-                print(f"Experiment {experiment_id} completed successfully")
-                return result
+            print(f"Experiment {experiment_id} completed successfully")
+            return result
 
         except Exception as e:
+            # Create artifacts zip (include any logs present) so logs end up in the experiment zip
+            try:
+                zip_path = self._package_artifacts(experiment_id, config.deliverables, temp_path)
+            except Exception:
+                zip_path = None
+
+            # Attempt to record zip-qualified paths for logs
             end_time = datetime.now()
             error_msg = str(e)
+
+            # If logs exist in the working dir, record their paths inside the zip using a 'zip-qualified' string
+            stdout_zip_path = None
+            stderr_zip_path = None
+            try:
+                if zip_path and (temp_path / "training_stdout.txt").exists():
+                    stdout_zip_path = f"{zip_path}::training_stdout.txt"
+                if zip_path and (temp_path / "training_stderr.txt").exists():
+                    stderr_zip_path = f"{zip_path}::training_stderr.txt"
+            except Exception:
+                pass
+
+            # Clean up the temporary directory
+            try:
+                shutil.rmtree(temp_path)
+            except Exception:
+                pass
 
             result = ExperimentResult(
                 experiment_id=experiment_id,
                 status="failed",
                 start_time=start_time,
                 end_time=end_time,
-                error_message=error_msg
+                error_message=error_msg,
+                artifacts_path=str(zip_path) if zip_path else None,
+                training_stdout_path=stdout_zip_path,
+                training_stderr_path=stderr_zip_path,
             )
 
             print(f"Experiment {experiment_id} failed: {error_msg}")
             return result
+        finally:
+            # If the directory still exists (e.g., success path didn't remove it), remove it
+            try:
+                if temp_path.exists():
+                    shutil.rmtree(temp_path)
+            except Exception:
+                pass
 
     def _run_training_script(self, config: ExperimentConfig, working_dir: Path):
         """Run the training script with the provided configuration."""
         if not config.training_script:
             raise ValueError("No training script specified")
 
-        # Prepare command arguments
-        cmd = config.training_script.split()
+        # Prepare command arguments. Support list (preferred) or string for backward compatibility.
+        if isinstance(config.training_script, list):
+            cmd = config.training_script
+        else:
+            cmd = str(config.training_script).split()
 
         # Add configuration arguments
         for key, value in config.training_config.items():
@@ -160,17 +202,23 @@ class ExperimentRunner:
         print(f"Running command: {' '.join(cmd)}")
         print(f"Working directory: {working_dir}")
 
-        # Run the command
-        result = subprocess.run(
-            cmd,
-            cwd=working_dir,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        # Files to capture stdout/stderr
+        stdout_path = working_dir / "training_stdout.txt"
+        stderr_path = working_dir / "training_stderr.txt"
 
-        if result.returncode != 0:
-            raise RuntimeError(f"Training script failed: {result.stderr}")
+        # Run the command and stream stdout/stderr directly to files to avoid large memory use
+        with open(stdout_path, 'w', encoding='utf-8') as f_out, open(stderr_path, 'w', encoding='utf-8') as f_err:
+            proc = subprocess.run(
+                cmd,
+                cwd=working_dir,
+                stdout=f_out,
+                stderr=f_err,
+                text=True
+            )
+
+        if proc.returncode != 0:
+            # Provide a brief message; full logs are available in the files
+            raise RuntimeError(f"Training script failed (exit {proc.returncode}). See training_stderr.txt for details.")
 
     def _validate_deliverables(self, deliverables: List[Dict[str, Any]], working_dir: Path) -> Dict[str, Any]:
         """Validate that all expected deliverables exist."""
@@ -229,7 +277,12 @@ class ExperimentRunner:
         return status
 
     def _package_artifacts(self, experiment_id: str, deliverables: List[Dict[str, Any]], working_dir: Path) -> Path:
-        """Package experiment artifacts into a zip file."""
+        """Package experiment artifacts into a zip file.
+
+        Returns the path to the artifacts zip. The zip will include any deliverables that exist
+        in the working directory and the training log files `training_stdout.txt` and
+        `training_stderr.txt` when present.
+        """
         zip_path = self.artifacts_dir / f"{experiment_id}_artifacts.zip"
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
@@ -246,6 +299,15 @@ class ExperimentRunner:
                                 arcname = file_path.relative_to(working_dir)
                                 zip_file.write(file_path, arcname)
 
+            # Also include training stdout/stderr if present in working dir
+            stdout_path = working_dir / "training_stdout.txt"
+            stderr_path = working_dir / "training_stderr.txt"
+
+            if stdout_path.exists():
+                zip_file.write(stdout_path, "training_stdout.txt")
+            if stderr_path.exists():
+                zip_file.write(stderr_path, "training_stderr.txt")
+
         return zip_path
 
     def save_result(self, result: ExperimentResult):
@@ -257,7 +319,9 @@ class ExperimentRunner:
             'end_time': result.end_time.isoformat() if result.end_time else None,
             'deliverables_status': result.deliverables_status,
             'error_message': result.error_message,
-            'artifacts_path': result.artifacts_path
+            'artifacts_path': result.artifacts_path,
+            'training_stdout_path': result.training_stdout_path,
+            'training_stderr_path': result.training_stderr_path
         }
 
         if result.status == 'completed':
